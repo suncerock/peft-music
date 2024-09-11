@@ -1,0 +1,67 @@
+seed: 0501
+exp: mtat
+model_name: musicfm_lora
+
+data:
+  dataset:
+    manifest_path: metadata/mtat_clean.json
+    base_audio_path: ../data/MagnaTagATune/
+
+    length: -1
+  
+  batch_size: 16
+  train_shuffle: true
+  num_workers: 16
+
+model:
+  stat_path: musicfm/data/msd_stats.json
+  model_path: musicfm/data/pretrained_msd.pt   
+
+  conv_dim: 512
+  encoder_dim: 1024
+  encoder_depth: 6
+
+  lora_rank_att: 2
+  lora_rank_ffn: 2
+  lora_rank_conv: 2
+
+  optim:
+    optimizer:
+      name: Adam
+      args:
+        lr: 0.0001
+        weight_decay: 0.0
+
+    scheduler:
+      warmup_steps: 0
+      max_steps: 20000
+      lr_min: 1.0e-7
+
+trainer:
+  args:
+    max_epochs: -1
+    max_steps: 20000
+    gradient_clip_val: 1.0
+
+    accelerator: gpu
+    devices: [0]
+    deterministic: false
+    precision: bf16-mixed
+
+    check_val_every_n_epoch: 1
+    log_every_n_steps: 20
+
+  logger:
+    save_dir: &save_dir work_dir/mtat_clean/musicfm_lora_222_16_1e-4_0_nowarmup_1e-7
+    name: log
+
+  checkpoint:
+    dirpath: *save_dir
+    filename: epoch={epoch}-mAP={val/mAP:.3f}
+    auto_insert_metric_name: false
+
+    monitor: val/mAP
+    mode: max
+    save_top_k: 5
+    save_last: true
+    every_n_epochs: 1
