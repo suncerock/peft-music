@@ -30,3 +30,12 @@ The main branch serves as supplementary material for the paper and therefore con
 |              | **Adapter**            | .483     | .922     | .405     | .915     | .312     | **.840** |
 |              | **LoRA**               | .482     | .922     | .407     | .916     | .311     | **.840** |
 | **SOTA**     |                        | .488     | **.924** | **.414** | **.927** | **.321** | **.843** |
+
+
+## Usage
+Download checkpoints for [MusicFM](https://github.com/minzwon/musicfm) and [MERT](https://huggingface.co/m-a-p/MERT-v1-95M/tree/main) needs to be downloaded first, then update the path to the checkpoints in the config file.
+
+For training, run
+```
+python train.py PATH/TO/CONFIG.yaml
+```
