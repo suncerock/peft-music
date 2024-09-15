@@ -68,6 +68,32 @@ class AutoTaggingDataset(BaseSongLevelDataset):
         return (y == 1).astype(np.int64)
 
 
+class ClassificationDataset(BaseSongLevelDataset):
+    def __init__(self, data_list, base_audio_path, split, length=-1) -> None:
+        super().__init__(data_list, base_audio_path, split, length=length)
+
+    def convert_label(self, label, **kwargs):
+        y = np.array(label)
+        return y
+
+
+class TempoDataset(BaseSongLevelDataset):
+    BPM_BINS = 300
+    WIDEN_SIZE = 2
+    WIDEN_VALUE = 0.5
+
+    def __init__(self, data_list, base_audio_path, split, length=-1) -> None:
+        super().__init__(data_list, base_audio_path, split, length=length)
+
+    def convert_label(self, label, **kwargs):
+        y = np.zeros(TempoDataset.BPM_BINS, dtype=np.float32)
+        targets = np.arange(label - TempoDataset.WIDEN_SIZE, label + TempoDataset.WIDEN_SIZE + 1)
+        targets = targets[(targets >= 0) * (targets < TempoDataset.BPM_BINS)]
+        y[targets] = TempoDataset.WIDEN_VALUE
+        y[label] = 1
+        return y
+
+
 ALL_DATASETS = dict(
     mtat=AutoTaggingDataset,
 
@@ -75,4 +101,10 @@ ALL_DATASETS = dict(
     mtg_genre=AutoTaggingDataset,
     mtg_instrument=AutoTaggingDataset,
     mtg_moodtheme=AutoTaggingDataset,
+
+    gtzan_key=ClassificationDataset,
+    giantsteps_key=ClassificationDataset,
+
+    gtzan_tempo=TempoDataset,
+    giantsteps_tempo=TempoDataset
 )

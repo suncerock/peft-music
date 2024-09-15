@@ -3,6 +3,7 @@ from .backbone.musicfm import MusicFM25Hz
 
 from .modules.adapter import Wav2Vec2ConformerEncoderLayerAdapter
 from .modules.lora import LoRAConv1d, LoRALinear
+from .modules.ssf import SSFConv1d, SSFLinear
 
 EVAL_LENGTH_DEFAULT = 30 * 24000
 EVAL_LENGTH = dict(
@@ -233,3 +234,122 @@ class LoRAMusicFM(MusicFM):
         if lora_rank_conv is not None:
             model.conv_module.pointwise_conv1 = LoRAConv1d(model.conv_module.pointwise_conv1, lora_rank_conv)
             model.conv_module.pointwise_conv2 = LoRAConv1d(model.conv_module.pointwise_conv2, lora_rank_conv)
+
+
+class BitFitMusicFM(MusicFM):
+    def __init__(
+        self,
+        exp: str,
+
+        optim: Dict,
+
+        conv_dim: int = 512,
+        encoder_dim: int = 1024,
+        encoder_depth: int = 12,
+
+        bitfit_att: bool = True,
+        bitfit_ffn: bool = True,
+        bitfit_conv: bool = False,
+
+        stat_path: str = "./data/fma_classic_stats.json",
+        model_path: str = "./data/musicfm_25hz_FMA_330m_500k.pt",
+    ):
+
+        super().__init__(
+            exp=exp,
+            optim=optim,
+
+            conv_dim=conv_dim,
+            encoder_dim=encoder_dim,
+            encoder_depth=encoder_depth,
+            
+            freeze_conv=True,
+            freeze_conformer=True,
+            
+            stat_path=stat_path,
+            model_path=model_path
+        )
+
+        for layer in self.musicfm.conformer.layers:
+            self.intiailize_bitfit(
+                layer, bitfit_att=bitfit_att, bitfit_ffn=bitfit_ffn, bitfit_conv=bitfit_conv)
+
+
+    def intiailize_bitfit(self, model, bitfit_att=False, bitfit_ffn=False, bitfit_conv=False):
+        if bitfit_att:
+            model.self_attn.linear_q.bias.requires_grad = True
+            model.self_attn.linear_k.bias.requires_grad = True
+            model.self_attn.linear_v.bias.requires_grad = True
+            model.self_attn.linear_out.bias.requires_grad = True
+
+            model.self_attn_layer_norm.bias.requires_grad = True
+
+        if bitfit_ffn:
+            model.ffn1.intermediate_dense.bias.requires_grad = True
+            model.ffn1.output_dense.bias.requires_grad = True
+            model.ffn2.intermediate_dense.bias.requires_grad = True
+            model.ffn2.output_dense.bias.requires_grad = True
+
+            model.ffn1_layer_norm.bias.requires_grad = True
+            model.ffn2_layer_norm.bias.requires_grad = True
+            model.final_layer_norm.bias.requires_grad = True
+
+        if bitfit_conv:
+            model.conv_module.batch_norm.bias.requires_grad = True
+
+
+class SSFMusicFM(MusicFM):
+    def __init__(
+        self,
+        exp: str,
+
+        optim: Dict,
+
+        conv_dim: int = 512,
+        encoder_dim: int = 1024,
+        encoder_depth: int = 12,
+
+        ssf_att: bool = True,
+        ssf_ffn: bool = True,
+        ssf_conv: bool = False,
+
+        stat_path: str = "./data/fma_classic_stats.json",
+        model_path: str = "./data/musicfm_25hz_FMA_330m_500k.pt",
+    ):
+
+        super().__init__(
+            exp=exp,
+            optim=optim,
+
+            conv_dim=conv_dim,
+            encoder_dim=encoder_dim,
+            encoder_depth=encoder_depth,
+            
+            freeze_conv=True,
+            freeze_conformer=True,
+            
+            stat_path=stat_path,
+            model_path=model_path
+        )
+
+        for layer in self.musicfm.conformer.layers:
+            self.intiailize_ssf(
+                layer, ssf_att=ssf_att, ssf_ffn=ssf_ffn, ssf_conv=ssf_conv)
+
+
+    def intiailize_ssf(self, model, ssf_att=False, ssf_ffn=False, ssf_conv=False):
+        if ssf_att is not None:
+            model.self_attn.linear_q = SSFLinear(model.self_attn.linear_q)
+            model.self_attn.linear_k = SSFLinear(model.self_attn.linear_k)
+            model.self_attn.linear_v = SSFLinear(model.self_attn.linear_v)
+            model.self_attn.linear_out = SSFLinear(model.self_attn.linear_out)
+
+        if ssf_ffn is not None:
+            model.ffn1.intermediate_dense = SSFLinear(model.ffn1.intermediate_dense)
+            model.ffn1.output_dense = SSFLinear(model.ffn1.output_dense)
+            model.ffn2.intermediate_dense = SSFLinear(model.ffn2.intermediate_dense)
+            model.ffn2.output_dense = SSFLinear(model.ffn2.output_dense)
+
+        if ssf_conv is not None:
+            model.conv_module.pointwise_conv1 = SSFConv1d(model.conv_module.pointwise_conv1)
+            model.conv_module.pointwise_conv2 = SSFConv1d(model.conv_module.pointwise_conv2)

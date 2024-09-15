@@ -7,6 +7,7 @@ from .backbone.mert import MERTModel
 
 from .modules.adapter import HubertEncoderLayerAdapter
 from .modules.lora import LoRALinear
+from .modules.ssf import SSFConv1d, SSFLinear
 
 EVAL_LENGTH = 120000
 
@@ -219,3 +220,103 @@ class LoRAMERT(MERT):
         if lora_rank_ffn is not None:
             model.feed_forward.intermediate_dense = LoRALinear(model.feed_forward.intermediate_dense, lora_rank_ffn)
             model.feed_forward.output_dense = LoRALinear(model.feed_forward.output_dense, lora_rank_ffn)
+
+
+class BitFitMERT(MERT):
+    def __init__(
+        self,
+        exp: str,
+
+        optim: Dict,
+
+        encoder_dim: int = 768,
+        encoder_depth: int = 12,
+
+        bitfit_att: bool = True,
+        bitfit_ffn: bool = True,
+
+        model_size: Literal["95M", "330M"] = "95M",
+        ckpt_path: Optional[str] = "models/backbone/pytorch_model.bin"
+    ):
+
+        super().__init__(
+            exp=exp,
+            optim=optim,
+
+            encoder_dim=encoder_dim,
+            encoder_depth=encoder_depth,
+            
+            freeze_feature=True,
+            freeze_encoder=True,
+            
+            model_size=model_size,
+            ckpt_path=ckpt_path
+        )
+
+        for layer in self.mert.encoder.layers:
+            self.intiailize_bitfit(
+                layer, bitfit_att=bitfit_att, bitfit_ffn=bitfit_ffn)
+
+
+    def intiailize_bitfit(self, model, bitfit_att=False, bitfit_ffn=False):
+        if bitfit_att:
+            model.attention.q_proj.bias.requires_grad = True
+            model.attention.k_proj.bias.requires_grad = True
+            model.attention.v_proj.bias.requires_grad = True
+            model.attention.out_proj.bias.requires_grad = True
+
+            model.layer_norm.bias.requires_grad = True
+
+        if bitfit_ffn:
+            model.feed_forward.intermediate_dense.bias.requires_grad = True
+            model.feed_forward.output_dense.bias.requires_grad = True
+
+            model.final_layer_norm.bias.requires_grad = True
+
+
+class SSFMERT(MERT):
+    def __init__(
+        self,
+        exp: str,
+
+        optim: Dict,
+
+        encoder_dim: int = 1024,
+        encoder_depth: int = 12,
+
+        ssf_att: bool = True,
+        ssf_ffn: bool = True,
+
+        model_size: Literal["95M", "330M"] = "95M",
+        ckpt_path: Optional[str] = "models/backbone/pytorch_model.bin",
+    ):
+
+        super().__init__(
+            exp=exp,
+            optim=optim,
+
+            encoder_dim=encoder_dim,
+            encoder_depth=encoder_depth,
+            
+            freeze_feature=True,
+            freeze_encoder=True,
+            
+            model_size=model_size,
+            ckpt_path=ckpt_path
+        )
+
+        for layer in self.mert.encoder.layers:
+            self.intiailize_ssf(
+                layer, ssf_att=ssf_att, ssf_ffn=ssf_ffn)
+
+
+    def intiailize_ssf(self, model, ssf_att=False, ssf_ffn=False):
+        if ssf_att is not None:
+            model.attention.q_proj = SSFLinear(model.attention.q_proj)
+            model.attention.k_proj = SSFLinear(model.attention.k_proj)
+            model.attention.v_proj = SSFLinear(model.attention.v_proj)
+            model.attention.out_proj = SSFLinear(model.attention.out_proj)
+
+        if ssf_ffn is not None:
+            model.feed_forward.intermediate_dense = SSFLinear(model.feed_forward.intermediate_dense)
+            model.feed_forward.output_dense = SSFLinear(model.feed_forward.output_dense)

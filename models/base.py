@@ -16,11 +16,20 @@ N_OUTPUTS: Dict[str, int] = dict(
     mtg_genre=95,
     mtg_instrument=41,
     mtg_moodtheme=59,
+
+    gtzan_key=24,
+    giantsteps_key=24,
+
+    gtzan_tempo=300,
+    giantstep_tempo=300,
 )
 
 # help function
 def convert_scores_to_outputs(exp: str, scores):
-    output = torch.sigmoid(scores)
+    if exp.startswith("mtat") or exp.startswith("mtg"):
+        output = torch.sigmoid(scores)
+    elif exp.endswith("key") or exp.endswith("tempo"):
+        output = torch.softmax(scores, dim=-1)
     return output
 
 def aggregate_output_embedding(exp: str, emb):
